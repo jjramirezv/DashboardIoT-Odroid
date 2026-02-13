@@ -7,11 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Thermometer, Droplets, Wind, Mic, Users, Sun, Activity } from 'lucide-react-native';
 import { supabase } from './supabase'; 
 
-const { width } = Dimensions.get('window');
-
 // --- COMPONENTE VISUAL: TARJETA DE SENSOR ---
-const SensorCard = ({ title, value, unit, icon, colors }) => (
-  <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+// Añadimos la prop 'style' para poder personalizar anchos específicos
+const SensorCard = ({ title, value, unit, icon, colors, style }) => (
+  <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, style]}>
     <View style={styles.cardHeader}>
       <View style={styles.iconContainer}>{icon}</View>
       <Text style={styles.cardTitle}>{title}</Text>
@@ -23,32 +22,34 @@ const SensorCard = ({ title, value, unit, icon, colors }) => (
   </LinearGradient>
 );
 
-// --- COMPONENTE VISUAL: BARRA DE AFORO (Adaptada al nuevo layout) ---
+// --- COMPONENTE VISUAL: BARRA DE AFORO ---
 const OccupancyPanel = ({ count }) => {
-    // Lógica de color según aforo
-    let bgColors = ['#10B981', '#059669']; // Verde (Normal)
-    let statusText = "CAPACIDAD NORMAL";
+    let bgColors = ['#10B981', '#059669']; // Verde
+    let statusText = "NORMAL";
     
     if (count > 5) { 
         bgColors = ['#F59E0B', '#D97706']; // Naranja
-        statusText = "AFORO MEDIO";
+        statusText = "MEDIO";
     }
     if (count > 10) {
         bgColors = ['#EF4444', '#B91C1C']; // Rojo
-        statusText = "CAPACIDAD EXCEDIDA";
+        statusText = "LLENO";
     }
 
     return (
         <LinearGradient colors={bgColors} style={styles.occupancyPanel}>
-            <View style={styles.occupancyHeader}>
-                <Users color="white" size={40} />
+            <View style={styles.occupancyTop}>
                 <Text style={styles.occupancyTitle}>OCUPACIÓN</Text>
+                <Users color="rgba(255,255,255,0.8)" size={32} />
             </View>
-            <View style={styles.occupancyBody}>
+            
+            <View style={styles.occupancyCenter}>
                 <Text style={styles.occupancyValue}>{count}</Text>
                 <Text style={styles.occupancyUnit}>Personas</Text>
             </View>
+            
             <View style={styles.occupancyFooter}>
+                <View style={[styles.statusIndicator, {backgroundColor: 'white'}]} />
                 <Text style={styles.occupancyStatus}>{statusText}</Text>
             </View>
         </LinearGradient>
@@ -60,18 +61,15 @@ export default function App() {
       temperature: 0, humidity: 0, noise_level: 0, gas_level: 0, light_level: 0, people_count: 0 
   });
   
-  // --- LÓGICA DE DATOS (Solo Lectura) ---
   useEffect(() => {
     const fetchLatestData = async () => {
       try {
           const { data: initialData } = await supabase
             .from('sensor_readings')
             .select('*')
-            .eq('room_id', 'espera') // Ajusta esto si quieres que sea dinámico o fijo
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-          
           if (initialData) setData(initialData);
       } catch(e) { console.log("Esperando datos..."); }
     };
@@ -80,7 +78,7 @@ export default function App() {
     const sub = supabase
         .channel('odroid-display')
         .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'sensor_readings', filter: `room_id=eq.espera` }, 
+            { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, 
             (payload) => setData(payload.new)
         )
         .subscribe();
@@ -93,69 +91,71 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <StatusBar hidden={true} />
         
-        {/* HEADER */}
+        {/* HEADER COMPACTO */}
         <View style={styles.header}>
-            <View style={{flexDirection:'row', alignItems:'center'}}>
-                <Activity color="#0984e3" size={28} style={{marginRight: 10}} />
+            <View style={styles.headerLeft}>
+                <View style={styles.logoContainer}>
+                    <Activity color="white" size={24} />
+                </View>
                 <View>
-                    <Text style={styles.headerTitle}>Monitor de Área</Text>
-                    <Text style={styles.headerSubtitle}>SISTEMA SMARTHOSP - EN VIVO</Text>
+                    <Text style={styles.headerTitle}>SmartHosp</Text>
+                    <Text style={styles.headerSubtitle}>MONITOR DE ÁREA</Text>
                 </View>
             </View>
-            {/* Indicador de Estado (Solo visual) */}
             <View style={styles.statusBadge}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>ONLINE</Text>
+                <Text style={styles.statusText}>EN VIVO</Text>
             </View>
         </View>
 
-        {/* LAYOUT PRINCIPAL (Horizontal) */}
-        <View style={styles.mainContent}>
+        {/* CONTENIDO PRINCIPAL */}
+        <View style={styles.mainGrid}>
             
-            {/* COLUMNA IZQUIERDA: SENSORES (Grid 2x2 + Luz abajo) */}
-            <View style={styles.sensorsColumn}>
+            {/* IZQUIERDA: SENSORES (Flex 2.5) */}
+            <View style={styles.leftColumn}>
                 
-                <View style={styles.sensorRow}>
+                {/* FILA 1 */}
+                <View style={styles.row}>
                     <SensorCard 
                         title="Temperatura" value={data.temperature?.toFixed(1)} unit="°C" 
-                        icon={<Thermometer color="white" size={24} />} 
-                        colors={['#ff758c', '#ff7eb3']} 
+                        icon={<Thermometer color="white" size={22} />} 
+                        colors={['#FF6B6B', '#EE5253']} 
                     />
                     <SensorCard 
                         title="Humedad" value={data.humidity?.toFixed(0)} unit="%" 
-                        icon={<Droplets color="white" size={24} />} 
-                        colors={['#4facfe', '#00f2fe']} 
+                        icon={<Droplets color="white" size={22} />} 
+                        colors={['#48DBFB', '#0ABDE3']} 
                     />
                 </View>
 
-                <View style={styles.sensorRow}>
+                {/* FILA 2 */}
+                <View style={styles.row}>
                     <SensorCard 
                         title="Calidad CO2" value={data.gas_level?.toFixed(0)} unit="ppm" 
-                        icon={<Wind color="white" size={24} />} 
-                        colors={['#00c6fb', '#005bea']} 
+                        icon={<Wind color="white" size={22} />} 
+                        colors={['#54A0FF', '#2E86DE']} 
                     />
                     <SensorCard 
                         title="Ruido" value={data.noise_level?.toFixed(0)} unit="dB" 
-                        icon={<Mic color="white" size={24} />} 
-                        colors={['#a18cd1', '#fbc2eb']} 
+                        icon={<Mic color="white" size={22} />} 
+                        colors={['#A29BFE', '#6C5CE7']} 
                     />
                 </View>
 
-                {/* TARJETA DE LUZ (Ahora integrada) */}
-                <View style={styles.sensorRow}>
+                {/* FILA 3 - ILUMINACIÓN (OCUPA TODO EL ANCHO) */}
+                <View style={styles.row}>
                     <SensorCard 
-                        title="Iluminación" value={data.light_level?.toFixed(0)} unit="Lux" 
-                        icon={<Sun color="white" size={24} />} 
-                        colors={['#F2994A', '#F2C94C']} 
+                        title="Iluminación Ambiental" value={data.light_level?.toFixed(0)} unit="Lux" 
+                        icon={<Sun color="white" size={22} />} 
+                        colors={['#FECA57', '#FF9F43']} 
+                        style={{ width: '100%' }} // Truco visual: Ancho completo
                     />
-                    {/* Espacio vacío para mantener simetría o logo */}
-                    <View style={[styles.card, {backgroundColor:'transparent', elevation:0}]} />
                 </View>
 
             </View>
 
-            {/* COLUMNA DERECHA: AFORO (Panel Vertical Completo) */}
-            <View style={styles.peopleColumn}>
+            {/* DERECHA: OCUPACIÓN (Flex 1.2) */}
+            <View style={styles.rightColumn}>
                 <OccupancyPanel count={data.people_count} />
             </View>
 
@@ -167,54 +167,68 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EEF2F6', padding: 20 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F3F4F6', // Gris muy suave para fondo profesional
+    padding: 16 
+  },
   
   // HEADER
   header: { 
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
-      marginBottom: 20, paddingHorizontal: 10, paddingBottom: 15,
-      borderBottomWidth: 1, borderBottomColor: '#E0E0E0'
+      marginBottom: 16, backgroundColor: 'white', padding: 12, borderRadius: 16,
+      elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5
   },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#2d3436' },
-  headerSubtitle: { fontSize: 12, fontWeight: '600', color: '#636e72', letterSpacing: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  logoContainer: { 
+      backgroundColor: '#2E86DE', padding: 8, borderRadius: 10, marginRight: 12 
+  },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: '#2d3436' },
+  headerSubtitle: { fontSize: 10, fontWeight: '700', color: '#b2bec3', letterSpacing: 1 },
   
-  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0F2F1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#00B894', marginRight: 6 },
-  statusText: { fontSize: 12, fontWeight: '700', color: '#00695C' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E5F9E7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#2ED573', marginRight: 6 },
+  statusText: { fontSize: 12, fontWeight: '700', color: '#2ED573' },
 
-  // LAYOUT PRINCIPAL
-  mainContent: { flex: 1, flexDirection: 'row', gap: 20 },
+  // GRID PRINCIPAL
+  mainGrid: { flex: 1, flexDirection: 'row', gap: 16 },
 
-  // COLUMNA IZQUIERDA (Sensores)
-  sensorsColumn: { flex: 2, flexDirection: 'column', gap: 15 },
-  sensorRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 15 },
+  // COLUMNA IZQUIERDA
+  leftColumn: { flex: 2.5, flexDirection: 'column', gap: 16 },
+  row: { flex: 1, flexDirection: 'row', gap: 16 }, // flex: 1 aquí es clave para altura igual
   
-  // TARJETA SENSOR (Estilo original mantenido)
-  card: { flex: 1, height: 110, borderRadius: 20, padding: 15, justifyContent: 'space-between', elevation: 5 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center' },
-  iconContainer: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 10, marginRight: 10 },
-  cardTitle: { color: 'white', fontSize: 14, fontWeight: '600', opacity: 0.9 },
-  cardBody: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end' },
-  cardValue: { fontSize: 42, fontWeight: '700', color: 'white' },
-  cardUnit: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginLeft: 5, fontWeight: '500', marginBottom: 6 },
+  // COLUMNA DERECHA
+  rightColumn: { flex: 1.2 }, // Un poco más ancho para dar importancia
 
-  // COLUMNA DERECHA (Aforo)
-  peopleColumn: { flex: 1 },
+  // TARJETAS SENSORES
+  card: { 
+      flex: 1, borderRadius: 18, padding: 16, 
+      justifyContent: 'space-between', elevation: 4 
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  iconContainer: { backgroundColor: 'rgba(255,255,255,0.25)', padding: 6, borderRadius: 8 },
+  cardTitle: { color: 'white', fontSize: 13, fontWeight: '700', marginLeft: 8, flex: 1 },
+  cardBody: { alignItems: 'flex-end' },
+  cardValue: { fontSize: 36, fontWeight: '800', color: 'white' },
+  cardUnit: { fontSize: 14, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
+
+  // PANEL OCUPACIÓN
   occupancyPanel: { 
-      flex: 1, borderRadius: 25, padding: 20, 
+      flex: 1, borderRadius: 24, padding: 20, 
       alignItems: 'center', justifyContent: 'space-between', 
-      elevation: 8 
+      elevation: 6 
   },
-  occupancyHeader: { alignItems: 'center', marginTop: 10 },
-  occupancyTitle: { color: 'white', fontSize: 18, fontWeight: '800', marginTop: 10, letterSpacing: 1 },
+  occupancyTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  occupancyTitle: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700', letterSpacing: 1 },
   
-  occupancyBody: { alignItems: 'center' },
-  occupancyValue: { fontSize: 100, fontWeight: '900', color: 'white', lineHeight: 100 },
-  occupancyUnit: { fontSize: 18, color: 'rgba(255,255,255,0.8)', fontWeight: '600', textTransform: 'uppercase' },
+  occupancyCenter: { alignItems: 'center', justifyContent: 'center' },
+  occupancyValue: { fontSize: 90, fontWeight: '900', color: 'white', lineHeight: 90 },
+  occupancyUnit: { fontSize: 16, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginTop: -5 },
   
   occupancyFooter: { 
-      backgroundColor: 'rgba(0,0,0,0.2)', paddingHorizontal: 15, paddingVertical: 8, 
-      borderRadius: 15, marginBottom: 10 
+      flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)', 
+      paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 
   },
-  occupancyStatus: { color: 'white', fontWeight: 'bold', fontSize: 12, letterSpacing: 0.5 }
+  statusIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  occupancyStatus: { color: 'white', fontWeight: '800', fontSize: 14, letterSpacing: 0.5 }
 });
